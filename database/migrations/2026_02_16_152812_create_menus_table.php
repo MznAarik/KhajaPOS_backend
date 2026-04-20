@@ -10,14 +10,16 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('items', function (Blueprint $table) {
+        Schema::create('menus', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('category_id')->constrained('categories')->onDelete('cascade');
+            $table->foreignId('category_id')->constrained('categories')->cascadeOnDelete();
             $table->string('name', 100);
             $table->text('description')->nullable();
-            $table->float(10, 2);
-            $table->string('image_url')->nullable();
+            $table->decimal('price', 10, 2);
+            $table->string('food_type', 50);
             $table->boolean('is_available')->default(0);
+            $table->string('image_url')->nullable();
+            $table->softDeletes();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
@@ -29,6 +31,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('items');
+        Schema::dropIfExists('menu');
     }
 };

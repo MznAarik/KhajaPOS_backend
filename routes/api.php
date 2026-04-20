@@ -14,7 +14,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout']);
 
-Route::middleware(['auth:api','check.admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:api', 'check_admin'])->prefix('/admin/menus')->group(function () {
     Route::get('/', [AdminController::class, 'index']);
     Route::post('/', [AdminController::class, 'store']);
     Route::get('/{id}', [AdminController::class, 'show']);

@@ -49,8 +49,8 @@ class AuthController extends Controller
                 ]
             ]);
 
-        } catch (\Throwable $e) {
-            \Log::error('Login error: ' . $e->getMessage());
+        } catch (\Throwable $th) {
+            \Log::error('Login error: ' . $th->getMessage());
             return response()->json([
                 'status' => '0',
                 'message' => 'Login failed!'
@@ -75,11 +75,11 @@ class AuthController extends Controller
             'name' => 'required|min:5',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:8',
-            'role' => 'in:admin,cashier',
+            'role' => 'in:admin,user',
         ]);
         try {
             $response = DB::transaction(function () use ($request) {
-                $requestedRole = $request->input('role', 'cashier');
+                $requestedRole = $request->input('role', 'user');
 
                 if ($requestedRole === 'admin') {
                     $authUser = Auth::user();
@@ -108,8 +108,8 @@ class AuthController extends Controller
 
             return $response;
 
-        } catch (\Throwable $e) {
-            \Log::error('Login error: ' . $e->getMessage());
+        } catch (\Throwable $th) {
+            \Log::error('Login error: ' . $th->getMessage());
             return response()->json([
                 'status' => '0',
                 'message' => 'Login failed!'
