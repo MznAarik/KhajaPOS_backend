@@ -17,8 +17,117 @@ class AdminController extends Controller
     public function index(Request $request)
     {
         try {
-            $data = Category::with('items')->get();
+            $search = trim((string) $request->query('search', ''));
+            $status = trim((string) $request->query('status', 'all'));
+            $availability = trim((string) $request->query('availability', 'all'));
+            $categoryId = (int) $request->query('category_id', 0);
+            $page = max((int) $request->query('page', 1), 1);
+            $perPage = max(min((int) $request->query('per_page', 10), 1000), 1);
 
+            $query = Category::with(['items' => function ($itemQuery) use ($search) {
+                $itemQuery->when($search !== '', function ($filteredItemQuery) use ($search) {
+                    $filteredItemQuery->where(function ($nestedQuery) use ($search) {
+                        $nestedQuery
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%")
+                            ->orWhere('food_type', 'like', "%{$search}%");
+                    });
+                });
+            }])
+                ->when($availability === 'available', function ($categoryQuery) {
+                    $categoryQuery->whereHas('items', function ($itemQuery) {
+                        $itemQuery->where('is_available', true);
+                    })->where('is_active', true);
+                })
+                ->when($availability === 'unavailable', function ($categoryQuery) {
+                    $categoryQuery->where(function ($nestedCategoryQuery) {
+                        $nestedCategoryQuery
+                            ->where('is_active', false)
+                            ->orWhereHas('items', function ($itemQuery) {
+                                $itemQuery->where('is_available', false);
+                            });
+                    });
+                })
+                ->when($status === 'active', function ($categoryQuery) {
+                    $categoryQuery->where('is_active', true);
+                })
+                ->when($status === 'inactive', function ($categoryQuery) {
+                    $categoryQuery->where('is_active', false);
+                })
+                ->when($categoryId > 0, function ($categoryQuery) use ($categoryId) {
+                    $categoryQuery->where('id', $categoryId);
+                })
+                ->when($search !== '', function ($categoryQuery) use ($search) {
+                    $categoryQuery->where(function ($nestedQuery) use ($search) {
+                        $nestedQuery
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%")
+                            ->orWhereHas('items', function ($itemQuery) use ($search) {
+                                $itemQuery->where(function ($deepNestedQuery) use ($search) {
+                                    $deepNestedQuery
+                                        ->where('name', 'like', "%{$search}%")
+                                        ->orWhere('description', 'like', "%{$search}%")
+                                        ->orWhere('food_type', 'like', "%{$search}%");
+                                });
+                            });
+                    });
+                })
+                ->latest();
+
+            $data = $query->get()->map(function ($category) use ($search, $availability) {
+                $filteredItems = $category->items;
+
+                if ($availability === 'available') {
+                    $filteredItems = $filteredItems->where('is_available', true);
+                }
+
+                if ($availability === 'unavailable') {
+                    $filteredItems = $category->is_active
+                        ? $filteredItems->where('is_available', false)
+                        : $filteredItems;
+                }
+
+                if ($search !== '') {
+                    $filteredItems = $filteredItems->values();
+                }
+
+                $category->setRelation('items', $filteredItems->values());
+
+                return $category;
+            })->filter(function ($category) {
+                return $category->items->isNotEmpty();
+            })->values();
+
+            if ($request->has('page') || $request->has('per_page')) {
+                $flattened = $data->flatMap(function ($category) {
+                    return $category->items->map(function ($item) use ($category) {
+                        return [
+                            'id' => $category->id,
+                            'name' => $category->name,
+                            'description' => $category->description,
+                            'is_active' => $category->is_active,
+                            'created_at' => $category->created_at,
+                            'updated_at' => $category->updated_at,
+                            'items' => [$item],
+                        ];
+                    });
+                })->values();
+
+                $total = $flattened->count();
+                $paginated = $flattened->forPage($page, $perPage)->values();
+                
+                return response()->json([
+                    'status' => 1,
+                    'data' => $paginated,
+                    'meta' => [
+                        'current_page' => $page,
+                        'per_page' => $perPage,
+                        'total' => $total,
+                        'last_page' => max((int) ceil($total / $perPage), 1),
+                    ],
+                ]);
+            }
+            
             return response()->json([
                 'status' => 1,
                 'data' => $data
@@ -49,11 +158,11 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:100|unique:categories,name',
             'description' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.name' => 'required|string|max:100',
+            'items' => 'nullable|array',
+            'items.*.name' => 'required_with:items|string|max:100',
             'items.*.description' => 'nullable|string',
-            'items.*.price' => 'required|numeric',
-            'items.*.food_type' => 'required|string|in:veg,non-veg',
+            'items.*.price' => 'required_with:items|numeric',
+            'items.*.food_type' => 'required_with:items|string|in:veg,non-veg,egg,vegan',
             'items.*.image_url' => 'nullable|string',
             'items.*.is_available' => 'nullable|boolean',
             'items.*.image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
@@ -65,36 +174,39 @@ class AdminController extends Controller
                 $category = Category::create([
                     'name' => strtolower($request->name),
                     'description' => $request->description,
-                    'is_active' => $request->is_active,
+                    'is_active' => $request->is_active ?? true,
                     'created_by' => Auth::id() ?? 0,
                 ]);
 
-                foreach ($request->items as $index => $itemData) {
-                    $imagePath = $itemData['image_url'] ?? null;
+                $item = null;
+                if ($request->filled('items')) {
+                    foreach ($request->items as $index => $itemData) {
+                        $imagePath = $itemData['image_url'] ?? null;
 
-                    if ($request->hasFile("items.$index.image")) {
-                        $file = $request->file("items.$index.image");
-                        $imageName = time() . '_' . $index . '.' . $file->getClientOriginalExtension();
-                        $imagePath = $file->storeAs('images', $imageName, 'public');
+                        if ($request->hasFile("items.$index.image")) {
+                            $file = $request->file("items.$index.image");
+                            $imageName = time() . '_' . $index . '.' . $file->getClientOriginalExtension();
+                            $imagePath = $file->storeAs('images', $imageName, 'public');
+                        }
+
+                        $item = Menu::create([
+                            'category_id' => $category->id ?? 0,
+                            'name' => strtolower($itemData['name']),
+                            'description' => $itemData['description'],
+                            'price' => $itemData['price'],
+                            'food_type' => strtolower($itemData['food_type']),
+                            'image_url' => $imagePath ?? null,
+                            'is_available' => $itemData['is_available'] ?? false,
+                            'created_by' => Auth::id() ?? 0,
+                        ]);
                     }
-
-                    $item = Menu::create([
-                        'category_id' => $category->id ?? 0,
-                        'name' => strtolower($itemData['name']),
-                        'description' => $itemData['description'],
-                        'price' => $itemData['price'],
-                        'food_type' => strtolower($itemData['food_type']),
-                        'image_url' => $imagePath ?? null,
-                        'is_available' => $itemData['is_available'] ?? false,
-                        'created_by' => Auth::id() ?? 0,
-                    ]);
                 }
 
                 return response()->json([
                     'status' => 1,
                     'message' => 'Category saved sucessfully!',
                     'category' => $category->refresh(),
-                    'items' => $item->refresh(),
+                    'items' => $item ? $item->refresh() : null,
                 ]);
             });
 
@@ -139,12 +251,12 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:100|unique:categories,name,' . $id,
             'description' => 'nullable|string',
-            'items' => 'required|array|min:1',
+            'items' => 'nullable|array',
             'items.*.id' => 'nullable|integer|exists:menus,id',
-            'items.*.name' => 'required|string|max:100',
+            'items.*.name' => 'required_with:items|string|max:100',
             'items.*.description' => 'nullable|string',
-            'items.*.price' => 'required|numeric',
-            'items.*.food_type' => 'required|string|in:veg,non-veg',
+            'items.*.price' => 'required_with:items|numeric',
+            'items.*.food_type' => 'required_with:items|string|in:veg,non-veg,egg,vegan',
             'items.*.image_url' => 'nullable|string',
             'items.*.is_available' => 'nullable|boolean',
             'items.*.image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
@@ -163,58 +275,60 @@ class AdminController extends Controller
                 $category->update([
                     'name' => strtolower($request->name),
                     'description' => $request->description,
-                    'is_active' => $request->is_active,
+                    'is_active' => $request->is_active ?? $category->is_active,
                     'updated_by' => Auth::id() ?? 0,
                 ]);
 
                 $lastItem = null;
-                foreach ($request->items as $index => $itemData) {
-                    $lastItem = null;
+                if ($request->filled('items')) {
+                    foreach ($request->items as $index => $itemData) {
+                        $lastItem = null;
 
-                    if (!empty($itemData['id'])) {
-                        $lastItem = Menu::where('category_id', $category->id)
-                            ->where('id', $itemData['id'])
-                            ->first();
-                    }
-
-                    if (!$lastItem) {
-                        $lastItem = Menu::where('category_id', $category->id)
-                            ->where('name', strtolower($itemData['name']))
-                            ->first();
-                    }
-
-                    $imagePath = $itemData['image_url'] ?? ($lastItem?->image_url);
-                    if ($request->hasFile("items.$index.image")) {
-                        if ($lastItem?->image_url && Storage::disk('public')->exists($lastItem->image_url)) {
-                            Storage::disk('public')->delete($lastItem->image_url);
+                        if (!empty($itemData['id'])) {
+                            $lastItem = Menu::where('category_id', $category->id)
+                                ->where('id', $itemData['id'])
+                                ->first();
                         }
-                        $file = $request->file("items.$index.image");
-                        $imageName = time() . '_' . $index . '.' . $file->getClientOriginalExtension();
-                        $imagePath = $file->storeAs('images', $imageName, 'public');
-                    }
 
-                    if ($lastItem) {
-                        $lastItem->update([
-                            'category_id' => $category->id ?? 0,
-                            'name' => strtolower($itemData['name']),
-                            'description' => $itemData['description'],
-                            'price' => $itemData['price'],
-                            'food_type' => strtolower($itemData['food_type']),
-                            'image_url' => $imagePath ?? null,
-                            'is_available' => $itemData['is_available'] ?? false,
-                            'updated_by' => Auth::id() ?? 0,
-                        ]);
-                    } else {
-                        $lastItem = Menu::create([
-                            'category_id' => $category->id ?? 0,
-                            'name' => strtolower($itemData['name']),
-                            'description' => $itemData['description'],
-                            'price' => $itemData['price'],
-                            'food_type' => strtolower($itemData['food_type']),
-                            'image_url' => $imagePath ?? null,
-                            'is_available' => $itemData['is_available'] ?? false,
-                            'created_by' => Auth::id() ?? 0,
-                        ]);
+                        if (!$lastItem) {
+                            $lastItem = Menu::where('category_id', $category->id)
+                                ->where('name', strtolower($itemData['name']))
+                                ->first();
+                        }
+
+                        $imagePath = $itemData['image_url'] ?? ($lastItem?->image_url);
+                        if ($request->hasFile("items.$index.image")) {
+                            if ($lastItem?->image_url && Storage::disk('public')->exists($lastItem->image_url)) {
+                                Storage::disk('public')->delete($lastItem->image_url);
+                            }
+                            $file = $request->file("items.$index.image");
+                            $imageName = time() . '_' . $index . '.' . $file->getClientOriginalExtension();
+                            $imagePath = $file->storeAs('images', $imageName, 'public');
+                        }
+
+                        if ($lastItem) {
+                            $lastItem->update([
+                                'category_id' => $category->id ?? 0,
+                                'name' => strtolower($itemData['name']),
+                                'description' => $itemData['description'],
+                                'price' => $itemData['price'],
+                                'food_type' => strtolower($itemData['food_type']),
+                                'image_url' => $imagePath ?? null,
+                                'is_available' => $itemData['is_available'] ?? false,
+                                'updated_by' => Auth::id() ?? 0,
+                            ]);
+                        } else {
+                            $lastItem = Menu::create([
+                                'category_id' => $category->id ?? 0,
+                                'name' => strtolower($itemData['name']),
+                                'description' => $itemData['description'],
+                                'price' => $itemData['price'],
+                                'food_type' => strtolower($itemData['food_type']),
+                                'image_url' => $imagePath ?? null,
+                                'is_available' => $itemData['is_available'] ?? false,
+                                'created_by' => Auth::id() ?? 0,
+                            ]);
+                        }
                     }
                 }
                 return response()->json([
