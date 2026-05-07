@@ -20,6 +20,9 @@ class AdminController extends Controller
             $search = trim((string) $request->query('search', ''));
             $status = trim((string) $request->query('status', 'all'));
             $availability = trim((string) $request->query('availability', 'all'));
+            $categoryId = (int) $request->query('category_id', 0);
+            $page = max((int) $request->query('page', 1), 1);
+            $perPage = max(min((int) $request->query('per_page', 10), 1000), 1);
 
             $query = Category::with(['items' => function ($itemQuery) use ($search) {
                 $itemQuery->when($search !== '', function ($filteredItemQuery) use ($search) {
@@ -50,6 +53,9 @@ class AdminController extends Controller
                 })
                 ->when($status === 'inactive', function ($categoryQuery) {
                     $categoryQuery->where('is_active', false);
+                })
+                ->when($categoryId > 0, function ($categoryQuery) use ($categoryId) {
+                    $categoryQuery->where('id', $categoryId);
                 })
                 ->when($search !== '', function ($categoryQuery) use ($search) {
                     $categoryQuery->where(function ($nestedQuery) use ($search) {
@@ -91,6 +97,36 @@ class AdminController extends Controller
             })->filter(function ($category) {
                 return $category->items->isNotEmpty();
             })->values();
+
+            if ($request->has('page') || $request->has('per_page')) {
+                $flattened = $data->flatMap(function ($category) {
+                    return $category->items->map(function ($item) use ($category) {
+                        return [
+                            'id' => $category->id,
+                            'name' => $category->name,
+                            'description' => $category->description,
+                            'is_active' => $category->is_active,
+                            'created_at' => $category->created_at,
+                            'updated_at' => $category->updated_at,
+                            'items' => [$item],
+                        ];
+                    });
+                })->values();
+
+                $total = $flattened->count();
+                $paginated = $flattened->forPage($page, $perPage)->values();
+                
+                return response()->json([
+                    'status' => 1,
+                    'data' => $paginated,
+                    'meta' => [
+                        'current_page' => $page,
+                        'per_page' => $perPage,
+                        'total' => $total,
+                        'last_page' => max((int) ceil($total / $perPage), 1),
+                    ],
+                ]);
+            }
             
             return response()->json([
                 'status' => 1,
