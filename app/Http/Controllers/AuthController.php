@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Business;
 use App\Models\User;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -75,16 +77,20 @@ class AuthController extends Controller
             'name' => 'required|min:5',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:8',
-            'role' => 'in:admin,user',
         ]);
+
         try {
+
             $response = DB::transaction(function () use ($request) {
+
                 $requestedRole = $request->input('role', 'user');
 
                 if ($requestedRole === 'admin') {
+
                     $authUser = Auth::user();
 
-                    if (!$authUser || $authUser->role !== 'admin') {
+                    if (!$authUser || $authUser->role !== 'super_admin') {
+
                         return response()->json([
                             'status' => 0,
                             'message' => 'Unauthorized to create admin account!',
@@ -92,11 +98,22 @@ class AuthController extends Controller
                     }
                 }
 
-                User::create([
-                    'name' => $request->name,
+                $user = User::create([
+                    'name' => $request->name ?? 'N/A',
                     'email' => $request->email,
-                    'password' => $request->password,
+                    'password' => Hash::make($request->password),
                     'role' => $requestedRole,
+                    'created_at' => now()
+                ]);
+
+                $business = Business::create([
+                    'user_id' => $user->id,
+                    'name' => $request->business['name'] ?? 'N/A',
+                    'business_type' => $request->business['business_type'] ?? 'N/A',
+                    'phone' => $request->business['phone'] ?? 'N/A',
+                    'email' => $request->business['email'] ?? 'N/A',
+                    'address' => $request->business['address'] ?? 'N/A',
+                    'created_by' => $user->id,
                     'created_at' => now()
                 ]);
 
@@ -109,11 +126,13 @@ class AuthController extends Controller
             return $response;
 
         } catch (\Throwable $th) {
-            \Log::error('Login error: ' . $th->getMessage());
+
+            \Log::error('Register error: ' . $th->getMessage());
+
             return response()->json([
-                'status' => '0',
-                'message' => 'Login failed!'
-            ]);
+                'status' => 0,
+                'message' => 'Registration failed!'
+            ], 500);
         }
     }
 }
