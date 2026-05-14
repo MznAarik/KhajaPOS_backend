@@ -11,7 +11,7 @@ class Category extends Model
     use SoftDeletes;
     protected $fillable = [
         'name',
-        'description',
+        'business_id',
         'is_active',
         'created_by',
         'updated_by',

@@ -13,6 +13,7 @@ return new class extends Migration {
         Schema::create('menu_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('category_id')->constrained('categories')->cascadeOnDelete();
+            $table->foreignId('business_id')->constrained()->onDeleteCascade();
             $table->string('name', 100);
             $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
@@ -31,6 +32,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('menus');
+        Schema::dropIfExists('menu_items');
     }
 };

@@ -35,6 +35,13 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            if ($user->email_verified_at === null) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Email not verified! Please verify your email before logging in.',
+                ], 403);
+            }
+
             $authUser = Auth::user();
 
             $authUser->tokens()->update(['revoked' => true]);

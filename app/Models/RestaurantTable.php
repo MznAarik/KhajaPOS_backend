@@ -11,6 +11,7 @@ class RestaurantTable extends Model
     protected $fillable = [
         'table_no',
         'qr_code',
+        'business_id',
         'is_active',
         'created_by',
         'updated_by',

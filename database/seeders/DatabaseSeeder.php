@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Business;
 use App\Models\User;
 use Hash;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -18,7 +19,7 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
+        $user = User::factory()->create([
             'name' => 'admin',
             'email' => 'admin@gmail.com',
             'password' => Hash::make('admin@gmail.com'),
@@ -27,6 +28,17 @@ class DatabaseSeeder extends Seeder
             'created_at' => now(),
             'updated_at' => now(),
 
+        ]);
+        Business::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Khaja POS',
+            'business_type' => 'Restaurant',
+            'phone' => '9800000000',
+            'email' => 'admin@gmail.com',
+            'address' => 'Kathmandu, Nepal',
+            'created_by' => $user->id,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 }
