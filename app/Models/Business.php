@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Business extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
 
     protected $fillable = [
         'user_id',
@@ -22,8 +23,13 @@ class Business extends Model
         'updated_by',
     ];
 
-    public function businesses()
+    public function user()
     {
-        return $this->belongsTo('users');
+        return $this->belongsTo(User::class);
+    }
+
+    public function menu_items()
+    {
+        return $this->hasMany(MenuItem::class);
     }
 }

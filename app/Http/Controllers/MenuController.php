@@ -24,16 +24,20 @@ class MenuController extends Controller
             $page = max((int) $request->query('page', 1), 1);
             $perPage = max(min((int) $request->query('per_page', 10), 1000), 1);
 
-            $query = Category::with(['items' => function ($itemQuery) use ($search) {
-                $itemQuery->when($search !== '', function ($filteredItemQuery) use ($search) {
-                    $filteredItemQuery->where(function ($nestedQuery) use ($search) {
-                        $nestedQuery
-                            ->where('name', 'like', "%{$search}%")
-                            ->orWhere('description', 'like', "%{$search}%")
-                            ->orWhere('food_type', 'like', "%{$search}%");
-                    });
-                });
-            }])
+            $businessId = auth()->user()->business->id;
+            $query = Category::where('business_id', $businessId)->
+                with([
+                    'items' => function ($itemQuery) use ($search) {
+                        $itemQuery->when($search !== '', function ($filteredItemQuery) use ($search) {
+                            $filteredItemQuery->where(function ($nestedQuery) use ($search) {
+                                $nestedQuery
+                                    ->where('name', 'like', "%{$search}%")
+                                    ->orWhere('description', 'like', "%{$search}%")
+                                    ->orWhere('food_type', 'like', "%{$search}%");
+                            });
+                        });
+                    }
+                ])
                 ->when($availability === 'available', function ($categoryQuery) {
                     $categoryQuery->whereHas('items', function ($itemQuery) {
                         $itemQuery->where('is_available', true);
@@ -104,7 +108,6 @@ class MenuController extends Controller
                         return [
                             'id' => $category->id,
                             'name' => $category->name,
-                            'description' => $category->description,
                             'is_active' => $category->is_active,
                             'created_at' => $category->created_at,
                             'updated_at' => $category->updated_at,
@@ -115,7 +118,7 @@ class MenuController extends Controller
 
                 $total = $flattened->count();
                 $paginated = $flattened->forPage($page, $perPage)->values();
-                
+
                 return response()->json([
                     'status' => 1,
                     'data' => $paginated,
@@ -127,7 +130,7 @@ class MenuController extends Controller
                     ],
                 ]);
             }
-            
+
             return response()->json([
                 'status' => 1,
                 'data' => $data
@@ -156,8 +159,7 @@ class MenuController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:100|unique:categories,name',
-            'description' => 'nullable|string',
+            'name' => 'required|string|max:100',
             'items' => 'nullable|array',
             'items.*.name' => 'required_with:items|string|max:100',
             'items.*.description' => 'nullable|string',
@@ -171,9 +173,11 @@ class MenuController extends Controller
         try {
             $response = DB::transaction(function () use ($request) {
 
+                $businessId = auth()->user()->business->id;
+
                 $category = Category::create([
                     'name' => strtolower($request->name),
-                    'description' => $request->description,
+                    'business_id' => $businessId,
                     'is_active' => $request->is_active ?? true,
                     'created_by' => Auth::id() ?? 0,
                 ]);
@@ -191,6 +195,7 @@ class MenuController extends Controller
 
                         $item = Menu::create([
                             'category_id' => $category->id ?? 0,
+                            'business_id' => $businessId,
                             'name' => strtolower($itemData['name']),
                             'description' => $itemData['description'],
                             'price' => $itemData['price'],
@@ -222,6 +227,164 @@ class MenuController extends Controller
 
     }
 
+    public function storeItem(Request $request)
+    {
+        $request->validate([
+            'category_id' => 'required|integer|exists:categories,id',
+            'name' => 'required|string|max:100',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric',
+            'food_type' => 'required|string|in:veg,non-veg,egg,vegan',
+            'image_url' => 'nullable|string',
+            'is_available' => 'nullable|boolean',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        try {
+            $businessId = auth()->user()->business->id;
+            $category = Category::where('business_id', $businessId)->find($request->category_id);
+
+            if (!$category) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Category not found!',
+                ], 404);
+            }
+
+            $imagePath = $request->image_url;
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                $imageName = time() . '_menu.' . $file->getClientOriginalExtension();
+                $imagePath = $file->storeAs('images', $imageName, 'public');
+            }
+
+            $item = Menu::create([
+                'category_id' => $category->id,
+                'business_id' => $businessId,
+                'name' => strtolower(trim($request->name)),
+                'description' => $request->description,
+                'price' => $request->price,
+                'food_type' => strtolower($request->food_type),
+                'image_url' => $imagePath ?? null,
+                'is_available' => $request->boolean('is_available', true),
+                'created_by' => Auth::id() ?? 0,
+            ]);
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Menu item created successfully!',
+                'data' => $item->refresh(),
+            ]);
+        } catch (\Throwable $th) {
+            \Log::error('Failed to create menu item: ' . $th->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to create menu item!',
+            ], 500);
+        }
+    }
+
+    public function updateItem(Request $request, string $id)
+    {
+        $request->validate([
+            'category_id' => 'required|integer|exists:categories,id',
+            'name' => 'required|string|max:100',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric',
+            'food_type' => 'required|string|in:veg,non-veg,egg,vegan',
+            'image_url' => 'nullable|string',
+            'is_available' => 'nullable|boolean',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        try {
+            $businessId = auth()->user()->business->id;
+            $category = Category::where('business_id', $businessId)->find($request->category_id);
+
+            if (!$category) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Category not found!',
+                ], 404);
+            }
+
+            $item = Menu::where('business_id', $businessId)->find($id);
+            if (!$item) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Menu item not found!',
+                ], 404);
+            }
+
+            $imagePath = $request->image_url ?? $item->image_url;
+            if ($request->hasFile('image')) {
+                if ($item->image_url && Storage::disk('public')->exists($item->image_url)) {
+                    Storage::disk('public')->delete($item->image_url);
+                }
+                $file = $request->file('image');
+                $imageName = time() . '_menu_update.' . $file->getClientOriginalExtension();
+                $imagePath = $file->storeAs('images', $imageName, 'public');
+            }
+
+            $item->update([
+                'category_id' => $category->id,
+                'name' => strtolower(trim($request->name)),
+                'description' => $request->description,
+                'price' => $request->price,
+                'food_type' => strtolower($request->food_type),
+                'image_url' => $imagePath ?? null,
+                'is_available' => $request->boolean('is_available', $item->is_available),
+                'updated_by' => Auth::id() ?? 0,
+            ]);
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Menu item updated successfully!',
+                'data' => $item->refresh(),
+            ]);
+        } catch (\Throwable $th) {
+            \Log::error('Failed to update menu item: ' . $th->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to update menu item!',
+            ], 500);
+        }
+    }
+
+    public function destroyItem(string $id)
+    {
+        try {
+            $businessId = auth()->user()->business->id;
+            $item = Menu::where('business_id', $businessId)->find($id);
+
+            if (!$item) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Menu item not found!',
+                ], 404);
+            }
+
+            if ($item->image_url && Storage::disk('public')->exists($item->image_url)) {
+                Storage::disk('public')->delete($item->image_url);
+            }
+
+            $item->updated_by = Auth::id() ?? 0;
+            $item->save();
+            $item->delete();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Menu item deleted successfully!',
+            ]);
+        } catch (\Throwable $th) {
+            \Log::error('Failed to delete menu item: ' . $th->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to delete menu item!',
+            ], 500);
+        }
+    }
+
     /**
      * Display the specified resource.
      */
@@ -250,9 +413,8 @@ class MenuController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:100|unique:categories,name,' . $id,
-            'description' => 'nullable|string',
             'items' => 'nullable|array',
-            'items.*.id' => 'nullable|integer|exists:menus,id',
+            'items.*.id' => 'nullable|integer|exists:menu_items,id',
             'items.*.name' => 'required_with:items|string|max:100',
             'items.*.description' => 'nullable|string',
             'items.*.price' => 'required_with:items|numeric',
@@ -264,6 +426,8 @@ class MenuController extends Controller
 
         try {
             $response = DB::transaction(function () use ($request, $id) {
+
+                $businessId = auth()->user()->business->id;
 
                 $category = Category::find($id);
                 if (!$category) {
@@ -320,6 +484,7 @@ class MenuController extends Controller
                         } else {
                             $lastItem = Menu::create([
                                 'category_id' => $category->id ?? 0,
+                                'business_id' => $businessId,
                                 'name' => strtolower($itemData['name']),
                                 'description' => $itemData['description'],
                                 'price' => $itemData['price'],

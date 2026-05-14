@@ -12,6 +12,7 @@ return new class extends Migration {
             $table->string('table_no', 100)->unique();
             $table->string('qr_code', 160)->unique();
             $table->boolean('is_active')->default(true);
+            $table->softDeletes();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();

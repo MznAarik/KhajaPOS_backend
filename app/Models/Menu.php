@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Menu extends Model
 {
     use SoftDeletes;
-    protected $table = 'menus';
+    protected $table = 'menu_items';
     protected $fillable = [
         'category_id',
+        'business_id',
         'name',
         'description',
         'price',
