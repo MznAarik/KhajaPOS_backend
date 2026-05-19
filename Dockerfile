@@ -22,4 +22,9 @@ RUN composer install
 
 RUN chown -R www-data:www-data storage bootstrap/cache
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]
+
 EXPOSE 80
