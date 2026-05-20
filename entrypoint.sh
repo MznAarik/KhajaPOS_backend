@@ -10,5 +10,8 @@ echo "Clearing caches..."
 php artisan config:clear
 php artisan cache:clear
 
+echo "Seeding database..."
+php artisan db:seed --force
+
 echo "Starting server..."
 apache2-foreground
