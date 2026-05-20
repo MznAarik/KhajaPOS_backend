@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y \
 
 RUN a2enmod rewrite
 
-# 🔥 FIX: set Apache document root to /public
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
@@ -18,13 +17,16 @@ COPY . .
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-RUN composer install
-
-RUN chown -R www-data:www-data storage bootstrap/cache
+RUN composer install --no-interaction --prefer-dist
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-CMD ["/entrypoint.sh"]
+# 🔥 IMPORTANT: single clean permission fix
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 775 /var/www/html/storage \
+    && chmod -R 775 /var/www/html/bootstrap/cache
 
 EXPOSE 80
+
+CMD ["/entrypoint.sh"]
