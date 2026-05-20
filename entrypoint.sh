@@ -13,6 +13,9 @@ php artisan storage:link || true
 echo "Running migrations..."
 php artisan migrate --force
 
+echo "Generating Passport keys..."
+php artisan passport:keys --force
+
 echo "Optimizing app..."
 php artisan config:cache
 php artisan route:cache
