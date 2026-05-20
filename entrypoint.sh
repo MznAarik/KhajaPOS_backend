@@ -16,6 +16,12 @@ php artisan migrate --force
 echo "Generating Passport keys..."
 php artisan passport:keys --force
 
+echo "Creating personal access client..."
+php artisan passport:client --personal --name="Personal Access Client" --no-interaction
+
+echo "Seeding database..."
+php artisan db:seed --force
+
 echo "Optimizing app..."
 php artisan config:cache
 php artisan route:cache
