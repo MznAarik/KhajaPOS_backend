@@ -11,7 +11,7 @@ echo "Linking storage (safe)..."
 php artisan storage:link || true
 
 echo "Running migrations..."
-php artisan migrate --force
+php artisan migrate:fresh --force
 
 echo "Generating Passport keys..."
 php artisan passport:keys --force
