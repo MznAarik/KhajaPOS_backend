@@ -62,7 +62,7 @@ class AuthController extends Controller
             \Log::error('Login error: ' . $th->getMessage());
             return response()->json([
                 'status' => '0',
-                'message' => 'Login failed!'
+                'message' => 'Login failed! ' . $th->getMessage()
             ]);
         }
     }
@@ -138,7 +138,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'status' => 0,
-                'message' => 'Registration failed!'
+                'message' => 'Registration failed!' .$th->getMessage()
             ], 500);
         }
     }
