@@ -3,20 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
+use App\Http\Requests\CategoryStoreRequest;
+use App\Http\Requests\CategoryUpdateRequest;
+use App\Http\Services\CategoryService;
 
 class CategoryController extends Controller
 {
+    public function __construct(private readonly CategoryService $categoryService)
+    {
+    }
     public function index()
     {
         try {
             $businessId = auth()->user()->business->id;
-
-            $data = Category::where('business_id', $businessId)
-                ->latest()
-                ->get();
+            $data = $this->categoryService->index($businessId);
 
             return response()->json([
                 'status' => 1,
@@ -32,27 +32,12 @@ class CategoryController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(CategoryStoreRequest $request)
     {
         $businessId = auth()->user()->business->id;
 
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('categories', 'name')->where(fn ($query) => $query->where('business_id', $businessId)),
-            ],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
-
         try {
-            $category = Category::create([
-                'name' => strtolower(trim($validated['name'])),
-                'business_id' => $businessId,
-                'is_active' => $validated['is_active'] ?? true,
-                'created_by' => Auth::id(),
-            ]);
+            $category = $this->categoryService->create($businessId, $request->validated());
 
             return response()->json([
                 'status' => 1,
@@ -73,7 +58,7 @@ class CategoryController extends Controller
     {
         try {
             $businessId = auth()->user()->business->id;
-            $category = Category::where('business_id', $businessId)->find($id);
+            $category = $this->categoryService->findForBusiness($businessId, $id);
 
             if (!$category) {
                 return response()->json([
@@ -96,24 +81,12 @@ class CategoryController extends Controller
         }
     }
 
-    public function update(Request $request, string $id)
+    public function update(CategoryUpdateRequest $request, string $id)
     {
         $businessId = auth()->user()->business->id;
 
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('categories', 'name')
-                    ->ignore($id)
-                    ->where(fn ($query) => $query->where('business_id', $businessId)),
-            ],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
-
         try {
-            $category = Category::where('business_id', $businessId)->find($id);
+            $category = $this->categoryService->findForBusiness($businessId, $id);
 
             if (!$category) {
                 return response()->json([
@@ -122,11 +95,7 @@ class CategoryController extends Controller
                 ], 404);
             }
 
-            $category->update([
-                'name' => strtolower(trim($validated['name'])),
-                'is_active' => $validated['is_active'] ?? $category->is_active,
-                'updated_by' => Auth::id(),
-            ]);
+            $category = $this->categoryService->update($category, $request->validated());
 
             return response()->json([
                 'status' => 1,
@@ -156,9 +125,7 @@ class CategoryController extends Controller
                 ], 404);
             }
 
-            $category->updated_by = Auth::id();
-            $category->save();
-            $category->delete();
+            $this->categoryService->delete($category);
 
             return response()->json([
                 'status' => 1,
