@@ -10,8 +10,10 @@ php artisan route:clear
 echo "Linking storage..."
 php artisan storage:link || true
 
-echo "Running migrations..."
-php artisan migrate --force
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+    echo "Running migrations..."
+    php artisan migrate --force
+fi
 
 echo "Optimizing app..."
 php artisan config:cache
