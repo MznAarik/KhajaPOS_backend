@@ -15,6 +15,18 @@ fi
 echo "Seeding database..."
 php artisan db:seed --force
 
+echo "Generating app key..."
+php artisan key:generate
+
+echo "Generating passport keys..."
+php artisan passport:keys || true
+
+echo "Adding passport client..."
+php artisan passport:client || true
+
+echo "Adding passport personal access client..."
+php artisan passport:client --name="Laravel Personal Access Client" --personal || true
+
 echo "Linking storage..."
 php artisan storage:link || true
 
