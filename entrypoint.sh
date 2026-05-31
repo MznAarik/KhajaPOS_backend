@@ -23,8 +23,8 @@ fi
 # echo "Adding passport personal access client..."
 # php artisan passport:client --name="Laravel Personal Access Client" --personal || true
 
-# echo "Linking storage..."
-# php artisan storage:link || true
+echo "Linking public storage..."
+php artisan storage:link || true
 
 echo "Optimizing app..."
 php artisan config:cache
