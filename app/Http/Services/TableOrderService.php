@@ -10,6 +10,7 @@ use App\Models\RestaurantTable;
 use DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class TableOrderService
 {
@@ -80,7 +81,10 @@ class TableOrderService
 
     public function trackOrder(string $sessionToken)
     {
-        return Order::with(['table', 'items.menuItem'])->where('session_token', $sessionToken)->firstOrFail();
+        return Order::with(['table', 'items.menuItem'])
+            ->where('session_token', $sessionToken)
+            ->where('created_at', '>=', Carbon::now()->subDay())
+            ->firstOrFail();
     }
 
     public function confirmOrder(string $sessionToken, string $status)

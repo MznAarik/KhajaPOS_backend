@@ -50,12 +50,12 @@ class AuthService
     {
         return DB::transaction(function () use ($data) {
             $requestedRole = $data['role'] ?? 'user';
-            if ($requestedRole === 'admin') {
-                $authUser = Auth::user();
-                if (!$authUser || $authUser->role !== 'super_admin') {
-                    return response()->json(['status' => 0, 'message' => 'Unauthorized to create admin account!'], 403);
-                }
-            }
+            // if ($requestedRole === 'admin') {
+            //     $authUser = Auth::user();
+            //     if (!$authUser || $authUser->role !== 'super_admin') {
+            //         return response()->json(['status' => 0, 'message' => 'Unauthorized to create admin account!'], 403);
+            //     }
+            // }
 
             $user = User::create([
                 'name' => $data['name'] ?? 'N/A',

@@ -7,13 +7,13 @@ php artisan config:clear
 php artisan cache:clear
 php artisan route:clear
 
+# if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+    echo "Running migrations..."
+    php artisan migrate:fresh --force
+# fi
+
 echo "Linking storage..."
 php artisan storage:link || true
-
-if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
-    echo "Running migrations..."
-    php artisan migrate --force
-fi
 
 echo "Optimizing app..."
 php artisan config:cache
