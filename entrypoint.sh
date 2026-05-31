@@ -7,10 +7,13 @@ php artisan config:clear
 php artisan cache:clear
 php artisan route:clear
 
-# if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     echo "Running migrations..."
     php artisan migrate:fresh --force
-# fi
+fi
+
+echo "Seeding database..."
+php artisan db:seed --force
 
 echo "Linking storage..."
 php artisan storage:link || true
