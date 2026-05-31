@@ -19,25 +19,25 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        $user = User::factory()->create([
-            'name' => 'admin',
+        $user = User::updateOrCreate([
             'email' => 'admin@gmail.com',
+        ], [
+            'name' => 'admin',
             'password' => Hash::make('admin@gmail.com'),
             'role' => 'admin',
             'email_verified_at' => now(),
-            'created_at' => now(),
             'updated_at' => now(),
 
         ]);
-        Business::factory()->create([
+        Business::updateOrCreate([
+            'email' => 'admin@gmail.com',
+        ], [
             'user_id' => $user->id,
             'name' => 'Khaja POS',
             'business_type' => 'Restaurant',
             'phone' => '9800000000',
-            'email' => 'admin@gmail.com',
             'address' => 'Kathmandu, Nepal',
             'created_by' => $user->id,
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
     }
