@@ -14,16 +14,34 @@ use Carbon\Carbon;
 
 class TableOrderService
 {
+    private const PUBLIC_CODE_PREFIX = 'tbl_';
+
     public function adminTableIndex(int $businessId)
     {
         return RestaurantTable::where('business_id', $businessId)->latest()->get();
+    }
+
+    private function isSecurePublicCode(?string $code): bool
+    {
+        return is_string($code) && preg_match('/^tbl_[A-Za-z0-9]{40}$/', $code) === 1;
+    }
+
+    private function generateUniquePublicCode(): string
+    {
+        do {
+            $code = self::PUBLIC_CODE_PREFIX . Str::random(40);
+        } while (RestaurantTable::where('qr_code', $code)->exists());
+
+        return $code;
     }
 
     public function createTable(int $businessId, array $data)
     {
         return RestaurantTable::create([
             'table_no' => trim($data['table_no']),
-            'qr_code' => !empty($data['qr_code']) ? trim($data['qr_code']) : Str::slug(trim($data['table_no'])),
+            'qr_code' => $this->isSecurePublicCode($data['qr_code'] ?? null)
+                ? trim($data['qr_code'])
+                : $this->generateUniquePublicCode(),
             'business_id' => $businessId,
             'is_active' => $data['is_active'] ?? true,
             'created_by' => Auth::id() ?? 0,
@@ -32,9 +50,13 @@ class TableOrderService
 
     public function updateTable(RestaurantTable $table, array $data)
     {
+        $nextQrCode = $this->isSecurePublicCode($data['qr_code'] ?? null)
+            ? trim($data['qr_code'])
+            : ($this->isSecurePublicCode($table->qr_code) ? $table->qr_code : $this->generateUniquePublicCode());
+
         $table->update([
             'table_no' => trim($data['table_no']),
-            'qr_code' => trim($data['qr_code']),
+            'qr_code' => $nextQrCode,
             'is_active' => $data['is_active'] ?? $table->is_active,
             'updated_by' => Auth::id() ?? 0,
         ]);
@@ -85,6 +107,18 @@ class TableOrderService
             ->where('session_token', $sessionToken)
             ->where('created_at', '>=', Carbon::now()->subDay())
             ->firstOrFail();
+    }
+
+    public function tableOrders(string $qrCode)
+    {
+        $table = RestaurantTable::where('qr_code', $qrCode)->where('is_active', true)->firstOrFail();
+
+        return Order::with(['table', 'items.menuItem'])
+            ->where('table_id', $table->id)
+            ->where('business_id', $table->business_id)
+            ->where('created_at', '>=', Carbon::now()->subDay())
+            ->latest()
+            ->get();
     }
 
     public function confirmOrder(string $sessionToken, string $status)
