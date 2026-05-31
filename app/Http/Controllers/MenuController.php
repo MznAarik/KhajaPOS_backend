@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\MenuRequest;
+use App\Http\Requests\MenuIndexRequest;
 use App\Models\Category;
 use App\Models\Menu;
+use App\Http\Services\MenuService;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,10 +14,14 @@ use Illuminate\Support\Facades\Storage;
 
 class MenuController extends Controller
 {
+    public function __construct(private readonly MenuService $menuService)
+    {
+    }
+
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(MenuIndexRequest $request)
     {
         try {
             $search = trim((string) $request->query('search', ''));
@@ -25,110 +32,16 @@ class MenuController extends Controller
             $perPage = max(min((int) $request->query('per_page', 10), 1000), 1);
 
             $businessId = auth()->user()->business->id;
-            $query = Category::where('business_id', $businessId)->
-                with([
-                    'items' => function ($itemQuery) use ($search) {
-                        $itemQuery->when($search !== '', function ($filteredItemQuery) use ($search) {
-                            $filteredItemQuery->where(function ($nestedQuery) use ($search) {
-                                $nestedQuery
-                                    ->where('name', 'like', "%{$search}%")
-                                    ->orWhere('description', 'like', "%{$search}%")
-                                    ->orWhere('food_type', 'like', "%{$search}%");
-                            });
-                        });
-                    }
-                ])
-                ->when($availability === 'available', function ($categoryQuery) {
-                    $categoryQuery->whereHas('items', function ($itemQuery) {
-                        $itemQuery->where('is_available', true);
-                    })->where('is_active', true);
-                })
-                ->when($availability === 'unavailable', function ($categoryQuery) {
-                    $categoryQuery->where(function ($nestedCategoryQuery) {
-                        $nestedCategoryQuery
-                            ->where('is_active', false)
-                            ->orWhereHas('items', function ($itemQuery) {
-                                $itemQuery->where('is_available', false);
-                            });
-                    });
-                })
-                ->when($status === 'active', function ($categoryQuery) {
-                    $categoryQuery->where('is_active', true);
-                })
-                ->when($status === 'inactive', function ($categoryQuery) {
-                    $categoryQuery->where('is_active', false);
-                })
-                ->when($categoryId > 0, function ($categoryQuery) use ($categoryId) {
-                    $categoryQuery->where('id', $categoryId);
-                })
-                ->when($search !== '', function ($categoryQuery) use ($search) {
-                    $categoryQuery->where(function ($nestedQuery) use ($search) {
-                        $nestedQuery
-                            ->where('name', 'like', "%{$search}%")
-                            ->orWhere('description', 'like', "%{$search}%")
-                            ->orWhereHas('items', function ($itemQuery) use ($search) {
-                                $itemQuery->where(function ($deepNestedQuery) use ($search) {
-                                    $deepNestedQuery
-                                        ->where('name', 'like', "%{$search}%")
-                                        ->orWhere('description', 'like', "%{$search}%")
-                                        ->orWhere('food_type', 'like', "%{$search}%");
-                                });
-                            });
-                    });
-                })
-                ->latest();
-
-            $data = $query->get()->map(function ($category) use ($search, $availability) {
-                $filteredItems = $category->items;
-
-                if ($availability === 'available') {
-                    $filteredItems = $filteredItems->where('is_available', true);
-                }
-
-                if ($availability === 'unavailable') {
-                    $filteredItems = $category->is_active
-                        ? $filteredItems->where('is_available', false)
-                        : $filteredItems;
-                }
-
-                if ($search !== '') {
-                    $filteredItems = $filteredItems->values();
-                }
-
-                $category->setRelation('items', $filteredItems->values());
-
-                return $category;
-            })->filter(function ($category) {
-                return $category->items->isNotEmpty();
-            })->values();
+            $data = $this->menuService->getMenuIndexData($businessId, $search, $status, $availability, $categoryId);
 
             if ($request->has('page') || $request->has('per_page')) {
-                $flattened = $data->flatMap(function ($category) {
-                    return $category->items->map(function ($item) use ($category) {
-                        return [
-                            'id' => $category->id,
-                            'name' => $category->name,
-                            'is_active' => $category->is_active,
-                            'created_at' => $category->created_at,
-                            'updated_at' => $category->updated_at,
-                            'items' => [$item],
-                        ];
-                    });
-                })->values();
+                $paginated = $this->menuService->paginateFlattenedMenuIndexData(
+                    $this->menuService->flattenMenuIndexData($data),
+                    $page,
+                    $perPage
+                );
 
-                $total = $flattened->count();
-                $paginated = $flattened->forPage($page, $perPage)->values();
-
-                return response()->json([
-                    'status' => 1,
-                    'data' => $paginated,
-                    'meta' => [
-                        'current_page' => $page,
-                        'per_page' => $perPage,
-                        'total' => $total,
-                        'last_page' => max((int) ceil($total / $perPage), 1),
-                    ],
-                ]);
+                return response()->json(['status' => 1] + $paginated);
             }
 
             return response()->json([
@@ -156,19 +69,8 @@ class MenuController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(MenuRequest $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'items' => 'nullable|array',
-            'items.*.name' => 'required_with:items|string|max:100',
-            'items.*.description' => 'nullable|string',
-            'items.*.price' => 'required_with:items|numeric',
-            'items.*.food_type' => 'required_with:items|string|in:veg,non-veg,egg,vegan',
-            'items.*.image_url' => 'nullable|string',
-            'items.*.is_available' => 'nullable|boolean',
-            'items.*.image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
-        ]);
 
         try {
             $response = DB::transaction(function () use ($request) {
@@ -227,18 +129,8 @@ class MenuController extends Controller
 
     }
 
-    public function storeItem(Request $request)
+    public function storeItem(MenuRequest $request)
     {
-        $request->validate([
-            'category_id' => 'required|integer|exists:categories,id',
-            'name' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'food_type' => 'required|string|in:veg,non-veg,egg,vegan',
-            'image_url' => 'nullable|string',
-            'is_available' => 'nullable|boolean',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
-        ]);
 
         try {
             $businessId = auth()->user()->business->id;
@@ -284,18 +176,8 @@ class MenuController extends Controller
         }
     }
 
-    public function updateItem(Request $request, string $id)
+    public function updateItem(MenuRequest $request, string $id)
     {
-        $request->validate([
-            'category_id' => 'required|integer|exists:categories,id',
-            'name' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'food_type' => 'required|string|in:veg,non-veg,egg,vegan',
-            'image_url' => 'nullable|string',
-            'is_available' => 'nullable|boolean',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
-        ]);
 
         try {
             $businessId = auth()->user()->business->id;
