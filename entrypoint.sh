@@ -9,11 +9,13 @@ php artisan route:clear
 
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     echo "Running migrations..."
-    php artisan migrate:fresh --force
+    php artisan migrate --force
 fi
 
-# echo "Seeding database..."
-# php artisan db:seed --force
+if [ "${RUN_SEEDERS:-false}" = "true" ]; then
+    echo "Seeding database..."
+    php artisan db:seed --force
+fi
 
 # echo "Adding passport client..."
 # php artisan passport:client || true
