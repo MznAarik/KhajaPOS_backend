@@ -7,22 +7,22 @@ php artisan config:clear
 php artisan cache:clear
 php artisan route:clear
 
-# if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     echo "Running migrations..."
     php artisan migrate:fresh --force
-# fi
+fi
 
-echo "Seeding database..."
-php artisan db:seed --force
+# echo "Seeding database..."
+# php artisan db:seed --force
 
-echo "Adding passport client..."
-php artisan passport:client || true
+# echo "Adding passport client..."
+# php artisan passport:client || true
 
-echo "Adding passport personal access client..."
-php artisan passport:client --name="Laravel Personal Access Client" --personal || true
+# echo "Adding passport personal access client..."
+# php artisan passport:client --name="Laravel Personal Access Client" --personal || true
 
-echo "Linking storage..."
-php artisan storage:link || true
+# echo "Linking storage..."
+# php artisan storage:link || true
 
 echo "Optimizing app..."
 php artisan config:cache
