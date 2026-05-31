@@ -15,12 +15,6 @@ php artisan route:clear
 echo "Seeding database..."
 php artisan db:seed --force
 
-echo "Generating app key..."
-php artisan key:generate
-
-echo "Generating passport keys..."
-php artisan passport:keys || true
-
 echo "Adding passport client..."
 php artisan passport:client || true
 
