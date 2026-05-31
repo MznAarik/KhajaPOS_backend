@@ -201,6 +201,25 @@ class TableOrderController extends Controller
         }
     }
 
+    public function publicTableOrders(string $qrCode)
+    {
+        try {
+            $orders = $this->tableOrderService->tableOrders($qrCode);
+
+            return response()->json([
+                'status' => 1,
+                'data' => $orders,
+            ]);
+        } catch (\Throwable $th) {
+            \Log::error('Failed to fetch public table orders: ' . $th->getMessage());
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to fetch table orders!',
+            ], 500);
+        }
+    }
+
     public function publicConfirmOrder(string $sessionToken)
     {
         try {

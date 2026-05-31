@@ -17,9 +17,16 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout']);
 Route::get('/public/menu/{qrCode}', [TableOrderController::class, 'publicTableMenu']);
 Route::post('/public/orders', [TableOrderController::class, 'publicPlaceOrder']);
+Route::get('/public/tables/{qrCode}/orders', [TableOrderController::class, 'publicTableOrders']);
 Route::get('/public/orders/{sessionToken}', [TableOrderController::class, 'publicTrackOrder']);
 Route::patch('/public/orders/{sessionToken}/confirm', [TableOrderController::class, 'publicConfirmOrder']);
 Route::patch('/public/orders/{sessionToken}/cancel', [TableOrderController::class, 'publicCancelOrder']);
+
+Route::middleware('auth:api')->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+});
 
 Route::middleware(['auth:api', 'check_admin'])->prefix('/admin/categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);

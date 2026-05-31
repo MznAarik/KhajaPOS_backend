@@ -25,7 +25,7 @@ class TableStoreRequest extends FormRequest
         $businessId = auth()->user()->business->id ?? 0;
         return [
             'table_no' => ['required', 'string', 'max:100', Rule::unique('tables', 'table_no')->where(fn ($q) => $q->where('business_id', $businessId))],
-            'qr_code' => ['nullable', 'string', 'max:160', Rule::unique('tables', 'qr_code')->where(fn ($q) => $q->where('business_id', $businessId))],
+            'qr_code' => ['nullable', 'string', 'max:160', 'regex:/^tbl_[A-Za-z0-9]{40}$/', Rule::unique('tables', 'qr_code')->where(fn ($q) => $q->where('business_id', $businessId))],
             'is_active' => 'nullable|boolean',
         ];
     }
