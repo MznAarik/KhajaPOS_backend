@@ -20,6 +20,11 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
   php artisan migrate --force
 fi
 
+if [ "$RUN_FRESH_MIGRATIONS" = "true" ]; then
+  echo "Running migrations..."
+  php artisan migrate:fresh --force
+fi
+
 # Seed only if explicitly enabled (DO NOT auto seed in production normally)
 if [ "$RUN_SEEDERS" = "true" ]; then
   echo "Seeding database..."
