@@ -1,34 +1,41 @@
 #!/bin/sh
-
 set -e
 
-echo "Clearing old caches..."
-php artisan config:clear
-php artisan cache:clear
-php artisan route:clear
+echo "Starting Laravel container..."
 
-if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
-    echo "Running migrations..."
-    php artisan migrate --force
+# Wait for DB (optional but useful on cloud)
+if [ "$DB_CONNECTION" = "mysql" ] || [ "$DB_CONNECTION" = "pgsql" ]; then
+  echo "Waiting for database..."
+  sleep 5
 fi
 
-if [ "${RUN_SEEDERS:-false}" = "true" ]; then
-    echo "Seeding database..."
-    php artisan db:seed --force
+echo "Clearing cached config..."
+php artisan config:clear || true
+php artisan cache:clear || true
+php artisan route:clear || true
+
+# Run migrations (IMPORTANT: no migrate:fresh)
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+  echo "Running migrations..."
+  php artisan migrate --force
 fi
 
-# echo "Adding passport client..."
-# php artisan passport:client || true
+# Seed only if explicitly enabled (DO NOT auto seed in production normally)
+if [ "$RUN_SEEDERS" = "true" ]; then
+  echo "Seeding database..."
+  php artisan db:seed --force
+fi
 
-# echo "Adding passport personal access client..."
-# php artisan passport:client --name="Laravel Personal Access Client" --personal || true
+# Passport setup ONLY if explicitly enabled (danger zone)
+if [ "$RUN_PASSPORT_INSTALL" = "true" ]; then
+  echo "Installing Passport..."
+  php artisan passport:keys --force || true
+  php artisan passport:client --personal --force || true
+fi
 
-echo "Linking public storage..."
-php artisan storage:link || true
-
-echo "Optimizing app..."
+echo "Optimizing Laravel..."
 php artisan config:cache
 php artisan route:cache
 
-echo "Starting server..."
+echo "Starting Apache..."
 apache2-foreground
