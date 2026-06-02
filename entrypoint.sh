@@ -43,6 +43,12 @@ if [ "$DB_CONNECTION" = "mysql" ] || [ "$DB_CONNECTION" = "pgsql" ]; then
                                             php artisan passport:client --personal --name="KhajaPOS Personal Access Client"
                                             fi
 
+                                            
+                                            # Storage link
+                                            echo "Linking storage..."
+                                            php artisan storage:link || true
+
+
                                             echo "Optimizing Laravel..."
                                             php artisan config:cache
                                             php artisan route:cache
