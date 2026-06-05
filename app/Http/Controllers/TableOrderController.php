@@ -12,6 +12,7 @@ use App\Http\Requests\PublicPlaceOrderRequest;
 use App\Http\Requests\TableStoreRequest;
 use App\Http\Requests\TableUpdateRequest;
 use App\Http\Services\TableOrderService;
+use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,17 +28,11 @@ class TableOrderController extends Controller
             $businessId = auth()->user()->business->id;
             $tables = $this->tableOrderService->adminTableIndex($businessId);
 
-            return response()->json([
-                'status' => 1,
-                'data' => $tables,
-            ]);
+            return ApiResponse::success($tables);
         } catch (\Throwable $th) {
             \Log::error('Failed to fetch tables: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to fetch tables!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to fetch tables!', 500);
         }
     }
 
@@ -50,18 +45,11 @@ class TableOrderController extends Controller
         try {
             $table = $this->tableOrderService->createTable($businessId, $validated);
 
-            return response()->json([
-                'status' => 1,
-                'message' => 'Table created successfully.',
-                'data' => $table,
-            ]);
+            return ApiResponse::success($table, 'Table created successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to create table: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to create table!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to create table!', 500);
         }
     }
 
@@ -77,18 +65,11 @@ class TableOrderController extends Controller
                 $validated
             );
 
-            return response()->json([
-                'status' => 1,
-                'message' => 'Table updated successfully.',
-                'data' => $table->refresh(),
-            ]);
+            return ApiResponse::success($table->refresh(), 'Table updated successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to update table: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to update table!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to update table!', 500);
         }
     }
 
@@ -100,17 +81,11 @@ class TableOrderController extends Controller
                 RestaurantTable::where('business_id', $businessId)->findOrFail($id)
             );
 
-            return response()->json([
-                'status' => 1,
-                'message' => 'Table deleted successfully.',
-            ]);
+            return ApiResponse::success(null, 'Table deleted successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to delete table: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to delete table!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to delete table!', 500);
         }
     }
 
@@ -121,17 +96,11 @@ class TableOrderController extends Controller
 
             $orders = $this->tableOrderService->adminOrders($businessId);
 
-            return response()->json([
-                'status' => 1,
-                'data' => $orders,
-            ]);
+            return ApiResponse::success($orders);
         } catch (\Throwable $th) {
             \Log::error('Failed to fetch orders: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to fetch orders!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to fetch orders!', 500);
         }
     }
 
@@ -145,18 +114,11 @@ class TableOrderController extends Controller
                 $request->order_status
             );
 
-            return response()->json([
-                'status' => 1,
-                'message' => 'Order status updated successfully.',
-                'data' => $order->refresh()->load(['table', 'items.menuItem']),
-            ]);
+            return ApiResponse::success($order->refresh()->load(['table', 'items.menuItem']), 'Order status updated successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to update order status: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to update order status!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to update order status!', 500);
         }
     }
 
@@ -165,20 +127,14 @@ class TableOrderController extends Controller
         try {
             $result = $this->tableOrderService->publicTableMenu($qrCode);
 
-            return response()->json([
-                'status' => 1,
-                'data' => [
-                    'table' => $result['table'],
-                    'categories' => $result['categories'],
-                ],
+            return ApiResponse::success([
+                'table' => $result['table'],
+                'categories' => $result['categories'],
             ]);
         } catch (\Throwable $th) {
             \Log::error('Failed to fetch public table menu: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to fetch menu!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to fetch menu!', 500);
         }
     }
 
@@ -187,17 +143,11 @@ class TableOrderController extends Controller
         try {
             $order = $this->tableOrderService->trackOrder($sessionToken);
 
-            return response()->json([
-                'status' => 1,
-                'data' => $order,
-            ]);
+            return ApiResponse::success($order);
         } catch (\Throwable $th) {
             \Log::error('Failed to fetch public order: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to fetch order!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to fetch order!', 500);
         }
     }
 
@@ -213,10 +163,7 @@ class TableOrderController extends Controller
         } catch (\Throwable $th) {
             \Log::error('Failed to fetch public table orders: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to fetch table orders!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to fetch table orders!', 500);
         }
     }
 
@@ -225,19 +172,13 @@ class TableOrderController extends Controller
         try {
             $order = $this->tableOrderService->confirmOrder($sessionToken, 'confirmed');
             if (!$order) {
-                return response()->json([
-                    'status' => 0,
-                    'message' => 'This order can no longer be confirmed.',
-                ], 422);
+                return ApiResponse::error('This order can no longer be confirmed.', 422);
             }
-            return response()->json(['status' => 1, 'message' => 'Order confirmed successfully.', 'data' => $order]);
+            return ApiResponse::success($order, 'Order confirmed successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to confirm public order: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to confirm order!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to confirm order!', 500);
         }
     }
 
@@ -246,19 +187,13 @@ class TableOrderController extends Controller
         try {
             $order = $this->tableOrderService->confirmOrder($sessionToken, 'cancelled');
             if (!$order) {
-                return response()->json([
-                    'status' => 0,
-                    'message' => 'This order can no longer be cancelled.',
-                ], 422);
+                return ApiResponse::error('This order can no longer be cancelled.', 422);
             }
-            return response()->json(['status' => 1, 'message' => 'Order cancelled successfully.', 'data' => $order]);
+            return ApiResponse::success($order, 'Order cancelled successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to cancel public order: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to cancel order!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to cancel order!', 500);
         }
     }
 
@@ -267,18 +202,11 @@ class TableOrderController extends Controller
         try {
             $order = $this->tableOrderService->placeOrder($request->validated());
 
-            return response()->json([
-                'status' => 1,
-                'message' => 'Order placed successfully.',
-                'data' => $order,
-            ]);
+            return ApiResponse::success($order, 'Order placed successfully.');
         } catch (\Throwable $th) {
             \Log::error('Failed to place order: ' . $th->getMessage());
 
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to place order!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to place order!', 500);
         }
     }
 }

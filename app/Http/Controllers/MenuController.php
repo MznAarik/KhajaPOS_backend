@@ -7,6 +7,7 @@ use App\Http\Requests\MenuIndexRequest;
 use App\Models\Category;
 use App\Models\Menu;
 use App\Http\Services\MenuService;
+use App\Support\ApiResponse;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -51,10 +52,7 @@ class MenuController extends Controller
 
         } catch (\Throwable $th) {
             \Log::error('Failed to get data:' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to get data!',
-            ]);
+            return ApiResponse::exception($th, 'Failed to get data!', 500);
         }
     }
 
@@ -121,10 +119,7 @@ class MenuController extends Controller
 
         } catch (\Throwable $th) {
             \Log::error('Failed to save: ' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to save category',
-            ]);
+            return ApiResponse::exception($th, 'Failed to save category', 500);
         }
 
     }
@@ -169,10 +164,7 @@ class MenuController extends Controller
             ]);
         } catch (\Throwable $th) {
             \Log::error('Failed to create menu item: ' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to create menu item!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to create menu item!', 500);
         }
     }
 
@@ -226,10 +218,7 @@ class MenuController extends Controller
             ]);
         } catch (\Throwable $th) {
             \Log::error('Failed to update menu item: ' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to update menu item!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to update menu item!', 500);
         }
     }
 
@@ -260,10 +249,7 @@ class MenuController extends Controller
             ]);
         } catch (\Throwable $th) {
             \Log::error('Failed to delete menu item: ' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to delete menu item!',
-            ], 500);
+            return ApiResponse::exception($th, 'Failed to delete menu item!', 500);
         }
     }
 
@@ -389,10 +375,7 @@ class MenuController extends Controller
             return $response;
         } catch (\Throwable $th) {
             \Log::error('Failed to update: ' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to save category',
-            ]);
+            return ApiResponse::exception($th, 'Failed to save category', 500);
         }
     }
 
@@ -434,10 +417,7 @@ class MenuController extends Controller
 
         } catch (\Throwable $th) {
             \Log::error('Failed to delete: ' . $th->getMessage());
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to save category',
-            ]);
+            return ApiResponse::exception($th, 'Failed to save category', 500);
         }
     }
 }
