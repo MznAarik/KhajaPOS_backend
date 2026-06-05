@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout']);
 Route::get('/public/menu/{qrCode}', [TableOrderController::class, 'publicTableMenu']);
 Route::post('/public/orders', [TableOrderController::class, 'publicPlaceOrder']);
 Route::get('/public/tables/{qrCode}/orders', [TableOrderController::class, 'publicTableOrders']);
@@ -20,6 +19,8 @@ Route::patch('/public/orders/{sessionToken}/confirm', [TableOrderController::cla
 Route::patch('/public/orders/{sessionToken}/cancel', [TableOrderController::class, 'publicCancelOrder']);
 
 Route::middleware('auth:api')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+
     Route::get('/user', function (Request $request) {
         $user = $request->user()?->load('business');
 

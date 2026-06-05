@@ -53,10 +53,13 @@ class AuthService
 
     public function logout(Request $request): void
     {
-        $token = $request->user()?->token();
-        if ($token) {
-            $token->revoke();
+        $user = $request->user();
+
+        if (!$user) {
+            return;
         }
+
+        $user->tokens()->update(['revoked' => true]);
     }
 
     public function register(array $data): JsonResponse
