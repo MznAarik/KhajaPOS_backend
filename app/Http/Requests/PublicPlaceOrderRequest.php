@@ -26,7 +26,7 @@ class PublicPlaceOrderRequest extends FormRequest
             'remarks' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.menu_item_id' => 'required|exists:menu_items,id',
-            'items.*.quantity' => 'required|integer|min:1|max:50',
+            'items.*.quantity' => 'required|integer|min:1|max:10',
         ];
     }
 }
