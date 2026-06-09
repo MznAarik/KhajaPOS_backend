@@ -7,6 +7,7 @@ use App\Models\Menu;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\RestaurantTable;
+use App\Http\Requests\AdminOrderUpdateRequest;
 use App\Http\Requests\OrderStatusUpdateRequest;
 use App\Http\Requests\PublicPlaceOrderRequest;
 use App\Http\Requests\TableStoreRequest;
@@ -119,6 +120,26 @@ class TableOrderController extends Controller
             \Log::error('Failed to update order status: ' . $th->getMessage());
 
             return ApiResponse::exception($th, 'Failed to update order status!', 500);
+        }
+    }
+
+    public function adminOrderUpdate(AdminOrderUpdateRequest $request, string $id)
+    {
+        try {
+            $businessId = auth()->user()->business->id;
+            $order = Order::with(['table', 'items.menuItem'])->where('business_id', $businessId)->findOrFail($id);
+
+            if (in_array($order->order_status, ['served', 'cancelled'], true)) {
+                return ApiResponse::error('Served or cancelled orders cannot be edited.', 422);
+            }
+
+            $order = $this->tableOrderService->updateOrder($order, $request->validated());
+
+            return ApiResponse::success($order, 'Order updated successfully.');
+        } catch (\Throwable $th) {
+            \Log::error('Failed to update order: ' . $th->getMessage());
+
+            return ApiResponse::exception($th, 'Failed to update order!', 500);
         }
     }
 
