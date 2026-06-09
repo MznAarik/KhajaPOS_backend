@@ -84,6 +84,38 @@ class TableOrderService
         return $order->refresh()->load(['table', 'items.menuItem']);
     }
 
+    public function updateOrder(Order $order, array $data)
+    {
+        return DB::transaction(function () use ($order, $data) {
+            $itemsById = $order->items()->get()->keyBy('id');
+
+            foreach ($data['items'] as $itemData) {
+                $item = $itemsById->get((int) $itemData['id']);
+
+                if (!$item) {
+                    abort(422, 'One or more order items are invalid.');
+                }
+
+                $item->update([
+                    'quantity' => (int) $itemData['quantity'],
+                    'updated_by' => Auth::id() ?? 0,
+                ]);
+            }
+
+            $totalAmount = $order->items()->get()->sum(
+                fn (OrderItem $item) => (float) $item->price * (int) $item->quantity
+            );
+
+            $order->update([
+                'remarks' => $data['remarks'] ?? null,
+                'total_amount' => $totalAmount,
+                'updated_by' => Auth::id() ?? 0,
+            ]);
+
+            return $order->refresh()->load(['table', 'items.menuItem']);
+        });
+    }
+
     public function publicTableMenu(string $qrCode)
     {
         $table = RestaurantTable::where('qr_code', $qrCode)->where('is_active', true)->firstOrFail();

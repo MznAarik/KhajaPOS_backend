@@ -94,5 +94,6 @@ Route::middleware(['auth:api', 'check_admin'])->prefix('/admin/tables')->group(f
 
 Route::middleware(['auth:api', 'check_admin'])->prefix('/admin/orders')->group(function () {
     Route::get('/', [TableOrderController::class, 'adminOrderIndex']);
+    Route::put('/{id}', [TableOrderController::class, 'adminOrderUpdate']);
     Route::patch('/{id}/status', [TableOrderController::class, 'adminOrderStatusUpdate']);
 });
