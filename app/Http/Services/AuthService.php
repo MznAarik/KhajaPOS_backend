@@ -6,7 +6,6 @@ use App\Models\Business;
 use App\Models\User;
 use DB;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\JsonResponse;
 
@@ -19,11 +18,11 @@ class AuthService
         if (!$user) {
             return response()->json([
                 'status' => 0,
-                'message' => 'Invalid credentials.',
+                'message' => 'No user found! Please register first.',
             ], 401);
         }
 
-        if (!Auth::attempt(['email' => $email, 'password' => $password])) {
+        if (!Hash::check($password, $user->password)) {
             return response()->json([
                 'status' => 0,
                 'message' => 'Invalid credentials.',
@@ -37,14 +36,13 @@ class AuthService
             ], 403);
         }
 
-        $authUser = Auth::user();
-        $accessToken = $authUser->createToken('authToken')->accessToken;
+        $accessToken = $user->createToken('authToken')->accessToken;
 
         return response()->json([
             'status' => 1,
             'message' => 'Login successful.',
             'data' => [
-                'user' => $authUser,
+                'user' => $user,
                 'token_type' => 'Bearer',
                 'access_token' => $accessToken,
             ],
