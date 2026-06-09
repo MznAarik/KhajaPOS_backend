@@ -6,16 +6,19 @@ use App\Http\Requests\MenuRequest;
 use App\Http\Requests\MenuIndexRequest;
 use App\Models\Category;
 use App\Models\Menu;
+use App\Http\Services\CloudinaryImageService;
 use App\Http\Services\MenuService;
 use App\Support\ApiResponse;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class MenuController extends Controller
 {
-    public function __construct(private readonly MenuService $menuService)
+    public function __construct(
+        private readonly MenuService $menuService,
+        private readonly CloudinaryImageService $imageService
+    )
     {
     }
 
@@ -89,8 +92,7 @@ class MenuController extends Controller
 
                         if ($request->hasFile("items.$index.image")) {
                             $file = $request->file("items.$index.image");
-                            $imageName = time() . '_' . $index . '.' . $file->getClientOriginalExtension();
-                            $imagePath = $file->storeAs('images', $imageName, 'public');
+                            $imagePath = $this->imageService->uploadMenuImage($file);
                         }
 
                         $item = Menu::create([
@@ -141,8 +143,7 @@ class MenuController extends Controller
             $imagePath = $request->image_url;
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
-                $imageName = time() . '_menu.' . $file->getClientOriginalExtension();
-                $imagePath = $file->storeAs('images', $imageName, 'public');
+                $imagePath = $this->imageService->uploadMenuImage($file);
             }
 
             $item = Menu::create([
@@ -192,12 +193,9 @@ class MenuController extends Controller
 
             $imagePath = $request->image_url ?? $item->image_url;
             if ($request->hasFile('image')) {
-                if ($item->image_url && Storage::disk('public')->exists($item->image_url)) {
-                    Storage::disk('public')->delete($item->image_url);
-                }
+                $this->imageService->deleteImage($item->image_url);
                 $file = $request->file('image');
-                $imageName = time() . '_menu_update.' . $file->getClientOriginalExtension();
-                $imagePath = $file->storeAs('images', $imageName, 'public');
+                $imagePath = $this->imageService->uploadMenuImage($file);
             }
 
             $item->update([
@@ -235,9 +233,7 @@ class MenuController extends Controller
                 ], 404);
             }
 
-            if ($item->image_url && Storage::disk('public')->exists($item->image_url)) {
-                Storage::disk('public')->delete($item->image_url);
-            }
+            $this->imageService->deleteImage($item->image_url);
 
             $item->updated_by = Auth::id() ?? 0;
             $item->save();
@@ -330,12 +326,9 @@ class MenuController extends Controller
 
                         $imagePath = $itemData['image_url'] ?? ($lastItem?->image_url);
                         if ($request->hasFile("items.$index.image")) {
-                            if ($lastItem?->image_url && Storage::disk('public')->exists($lastItem->image_url)) {
-                                Storage::disk('public')->delete($lastItem->image_url);
-                            }
+                            $this->imageService->deleteImage($lastItem?->image_url);
                             $file = $request->file("items.$index.image");
-                            $imageName = time() . '_' . $index . '.' . $file->getClientOriginalExtension();
-                            $imagePath = $file->storeAs('images', $imageName, 'public');
+                            $imagePath = $this->imageService->uploadMenuImage($file);
                         }
 
                         if ($lastItem) {
