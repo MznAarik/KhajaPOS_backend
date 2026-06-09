@@ -6,47 +6,61 @@ use App\Models\Business;
 use App\Models\User;
 use DB;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\JsonResponse;
 
 class AuthService
 {
-    public function login(string $email, string $password): array
+    public function login(string $email, string $password): JsonResponse
     {
         $user = User::where('email', $email)->first();
 
         if (!$user) {
-            return ['response' => response()->json(['status' => 0, 'message' => "No user found for '$email'. Please register first!"], 404)];
+            return response()->json([
+                'status' => 0,
+                'message' => 'No user found! Please register first.',
+            ], 401);
         }
 
-        if (!Auth::attempt(['email' => $email, 'password' => $password])) {
-            return ['response' => response()->json(['status' => 0, 'message' => 'Invalid credentials!'], 401)];
+        if (!Hash::check($password, $user->password)) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Invalid credentials.',
+            ], 401);
         }
 
         if ($user->email_verified_at === null) {
-            return ['response' => response()->json(['status' => 0, 'message' => 'Email not verified! Please verify your email before logging in.'], 403)];
+            return response()->json([
+                'status' => 0,
+                'message' => 'Account is not verified.',
+            ], 403);
         }
 
-        $authUser = Auth::user();
-        $accessToken = $authUser->createToken('authToken')->accessToken;
+        $accessToken = $user->createToken('authToken')->accessToken;
 
-        return ['response' => response()->json([
-            'message' => 'Login Successful!',
+        return response()->json([
+            'status' => 1,
+            'message' => 'Login successful.',
             'data' => [
-                'status' => 1,
-                'user' => $authUser,
+                'user' => $user,
                 'token_type' => 'Bearer',
                 'access_token' => $accessToken,
             ],
-        ])];
+        ]);
     }
 
     public function logout(Request $request): void
     {
-        $request->user()->tokens()->update(['revoked' => true]);
+        $user = $request->user();
+
+        if (!$user) {
+            return;
+        }
+
+        $user->tokens()->update(['revoked' => true]);
     }
 
-    public function register(array $data)
+    public function register(array $data): JsonResponse
     {
         return DB::transaction(function () use ($data) {
             $requestedRole = $data['role'] ?? 'user';
@@ -75,7 +89,10 @@ class AuthService
                 'created_by' => $user->id,
             ]);
 
-            return response()->json(['status' => 1, 'message' => 'Account created successfully'], 200);
+            return response()->json([
+                'status' => 1,
+                'message' => 'Account created successfully.',
+            ], 201);
         });
     }
 }

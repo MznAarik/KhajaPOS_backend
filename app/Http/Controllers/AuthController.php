@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AuthLoginRequest;
 use App\Http\Requests\AuthRegisterRequest;
 use App\Http\Services\AuthService;
+use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
@@ -16,23 +17,17 @@ class AuthController extends Controller
     public function login(AuthLoginRequest $request)
     {
         try {
-            return $this->authService->login($request->validated('email'), $request->validated('password'))['response'];
+            return $this->authService->login($request->validated('email'), $request->validated('password'));
         } catch (\Throwable $th) {
             \Log::error('Login error: ' . $th->getMessage());
-            return response()->json([
-                'status' => '0',
-                'message' => 'Login failed! ' . $th->getMessage()
-            ]);
+            return ApiResponse::exception($th, 'Login failed. Please try again.', 500);
         }
     }
 
     public function logout(Request $request)
     {
         $this->authService->logout($request);
-        return response()->json([
-            'status' => 1,
-            'message' => 'Logged out successfully!'
-        ]);
+        return ApiResponse::success(null, 'Logged out successfully!');
 
     }
 
@@ -45,11 +40,7 @@ class AuthController extends Controller
         } catch (\Throwable $th) {
 
             \Log::error('Register error: ' . $th->getMessage());
-
-            return response()->json([
-                'status' => 0,
-                'message' => 'Registration failed!' .$th->getMessage()
-            ], 500);
+            return ApiResponse::exception($th, 'Registration failed. Please try again.', 500);
         }
     }
 }
