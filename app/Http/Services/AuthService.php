@@ -18,7 +18,7 @@ class AuthService
         if (!$user) {
             return response()->json([
                 'status' => 0,
-                'message' => 'No user found! Please.',
+                'message' => 'No user found! Please register first.',
             ], 401);
         }
 
